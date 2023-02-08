@@ -1,0 +1,16 @@
+---
+- hosts: all
+  become: true
+  collections:
+    - nginxinc.nginx_core
+  tasks:
+    - name: Install NGINX
+      ansible.builtin.include_role:
+        name: nginx
+
+    - name: Enable ufw access for NGINX
+      ufw:
+        rule: allow
+        port: 80,443
+        proto: tcp
+

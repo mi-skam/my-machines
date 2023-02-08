@@ -1,0 +1,12 @@
+---
+- hosts: all
+  become: true
+
+  roles:
+    - role: letsencrypt
+      vars:
+        letsencrypt_email: maksim.codes@mailbox.org
+        main_domain_name: pub.miskam.xyz
+        all_domain_names:
+          - pub.miskam.xyz
+        deploy_sample_html: false

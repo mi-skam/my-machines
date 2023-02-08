@@ -1,0 +1,18 @@
+---
+- hosts: all
+  become: true
+  become_user: root
+
+  tasks:
+
+    - name: Install Apache
+      apt:
+        name: apache2
+        state: present
+
+    - name: "Start the Apache server"
+      register: starthttpdout
+      shell: "apache2 -k start"
+
+    - debug:
+        msg: "{{ starthttpdout.stdout }}"

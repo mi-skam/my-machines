@@ -1,0 +1,8 @@
+---
+- name: setup vpn server
+  hosts: vpn
+  tasks:
+  - name: ping
+    ping:
+  - name: show variables and facts
+    debug: var=hostvars

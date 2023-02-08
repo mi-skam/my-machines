@@ -1,0 +1,11 @@
+---
+# The path where Kirby will be downloaded and installed.
+kirby_core_path: "/var/www/kirbycms"
+
+# The resulting domain will be [domain].test (with .test appended).
+domain: "kirby"
+
+
+# Kirby Project Kit
+
+kirby_kit: getkirby/plainkit

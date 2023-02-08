@@ -1,0 +1,11 @@
+[dev]
+marco.miskam.xyz
+
+[vpn]
+vpn_server ansible_host=marco.miskam.xyz
+
+[qnap]
+zigzag ansible_user=plumps ansible_python_interpreter=/share/CACHEDEV1_DATA/.qpkg/Python3/python3/bin/python3
+
+[web]
+marco.miskam.xyz

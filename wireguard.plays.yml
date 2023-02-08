@@ -1,0 +1,110 @@
+# vim:ft=yaml.ansible:
+---
+- name: Setup wireguard client
+  hosts: localhost
+  connection: local
+  become: yes
+  handlers:
+    - name: Restart_wireguard
+      ansible.builtin.shell: wg-quick down wg0; wg-quick up wg0
+      args:
+        executable: /bin/bash
+
+  tasks:
+    - name: Install wireguard package
+      ansible.builtin.apt:
+        name: wireguard
+        state: present
+        update_cache: yes
+
+    - name: Generate private key
+      ansible.builtin.shell:
+        cmd: umask 077 && wg genkey | tee privatekey | wg pubkey > publickey
+        chdir: /etc/wireguard
+        creates: /etc/wireguard/publickey
+
+    - name: Get public key
+      ansible.builtin.command: cat /etc/wireguard/publickey
+      register: publickey_contents
+      changed_when: False
+
+    # Save pubkey as a fact, so we can use it to template wg0.conf for the server
+    - name: Set public key fact
+      ansible.builtin.set_fact:
+        pubkey: "{{ publickey_contents.stdout }}"
+
+    - name: Create client wireguard config
+      ansible.builtin.template:
+        dest: /etc/wireguard/wg0.conf
+        src: client_wg0.conf.j2
+        owner: root
+        group: root
+        mode: "0600"
+      notify: Reload wireguard
+
+- name: Setup wireguard server
+  hosts: vpn
+  become: true
+  vars:
+    # privkey=$(wg genkey) sh -c 'echo "
+    # server_privkey: $privkey
+    # server_pubkey: $(echo $privkey | wg pubkey)"'
+    # ansible-vault encrypt_string --ask-vault-password --stdin server_privkey
+    server_privkey: !vault |
+      $ANSIBLE_VAULT;1.1;AES256
+      37623936666530303231393861313939653963346231376661383566633633396234383034306562
+      3039356230306330633536643336363765376133643337650a316164646336316664373865313832
+      64623837333161306462666337616334343531373933316463626637313163333766663064303864
+      6232633730623362610a666436396139636564656336363436353066373932376564633731323530
+      65323138353366616130323434636633613435343464383466643438633831363831653534383663
+      6135376136393531303866393665313138613236363762393165
+    server_pubkey: 8A74Rgtk4lkPkhrmWj2YWdA1/7hfyGtwtOrbL6MVNiY=
+  handlers:
+    # Restarts WireGuard interface, loading any new config and running PostUp
+    # commands in the process. Notify this handler on client config changes.
+    - name: Reload wireguard
+      ansible.builtin.shell: wg syncconf wg0 <(wg-quick strip wg0)
+      args:
+        executable: /bin/bash
+
+  tasks:
+    # https://docs.ansible.com/ansible/latest/collections/ansible/builtin/apt_module.html
+    - name: Install wireguard package
+      ansible.builtin.apt:
+        name: wireguard
+        state: present
+        update_cache: yes
+
+    # https://docs.ansible.com/ansible/latest/collections/ansible/builtin/copy_module.html
+    - name: Create server wireguard config
+      ansible.builtin.template:
+        dest: /etc/wireguard/wg0.conf
+        src: server_wg0.conf.j2
+        owner: root
+        group: root
+        mode: "0600"
+      notify: Restart_wireguard
+
+    # https://docs.ansible.com/ansible/latest/collections/ansible/posix/sysctl_module.html
+    - name: Enable and persist ip forwarding
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_forward
+        value: "1"
+        state: present
+        sysctl_set: yes
+        reload: yes
+
+    # https://docs.ansible.com/ansible/latest/collections/ansible/builtin/systemd_module.html
+    - name: Start wireguard and enable on boot
+      ansible.builtin.systemd:
+        name: wg-quick@wg0
+        enabled: yes
+        state: started
+
+- name: Start vpn on client
+  hosts: localhost
+  connection: local
+  become: yes
+  tasks:
+    - name: Start Wireguard
+      ansible.builtin.command: wg-quick up wg0
